@@ -44,6 +44,7 @@ static std::string powerOutOnName;
 static std::string powerOutOffName;
 static std::string powerOkName;
 static std::string resetOutName;
+static std::string resetOutBtnName;
 static std::string nmiOutName;
 static std::string sioPwrGoodName;
 static std::string sioOnControlName;
@@ -1141,6 +1142,11 @@ static void reset()
     setGPIOOutputForMs(power_control::resetOutName, 1, resetPulseTimeMs);
 }
 
+static void resetFromBtn()
+{
+    setGPIOOutputForMs(power_control::resetOutBtnName, 0, resetPulseTimeMs);
+}
+
 static void gracefulPowerOffTimerStart()
 {
     std::cerr << "Graceful power-off timer started\n";
@@ -1353,7 +1359,6 @@ static void currentHostStateMonitor()
             if (*currentHostState ==
                 "xyz.openbmc_project.State.Host.HostState.Running")
             {
-                std::cerr << "Inside if (*currentHostState == xyz.openbmc_project.State.Host.HostState.Running)\n";
                 pohCounterTimerStart();
                 // Clear the restart cause set for the next restart
                 clearRestartCause();
@@ -1364,13 +1369,15 @@ static void currentHostStateMonitor()
             }
             else
             {
-                std::cerr << "Inside ELSE beginning\n";
                 pohCounterTimer.cancel();
                 // POST_COMPLETE GPIO event is not working in some platforms
                 // when power state is changed to OFF. This resulted in
                 // 'OperatingSystemState' to stay at 'Standby', even though
                 // system is OFF. Set 'OperatingSystemState' to 'Inactive'
                 // if HostState is trurned to OFF.
+
+                // Remove becaue we do not have POST_COPMLETE so we do not have
+                // the osIface...
                 // osIface->set_property("OperatingSystemState",
                 //                       std::string("Inactive"));
 
@@ -1381,8 +1388,6 @@ static void currentHostStateMonitor()
                                 "PRIORITY=%i", LOG_INFO,
                                 "REDFISH_MESSAGE_ID=%s",
                                 "OpenBMC.0.1.DCPowerOff", NULL);
-
-                std::cerr << "Inside ELSE end\n";
             }
         });
 }
@@ -1436,9 +1441,9 @@ static void powerStateOn(const Event event)
             gracefulPowerOff();
             break;
         case Event::resetButtonPressed:
-            //setPowerState(PowerState::checkForWarmReset);
-            //warmResetCheckTimerStart();
-            reset();
+            setPowerState(PowerState::checkForWarmReset);
+            warmResetCheckTimerStart();
+            resetFromBtn();
             break;
         case Event::powerOffRequest:
             setPowerState(PowerState::transitionToOff);
@@ -2075,34 +2080,34 @@ static void idButtonHandler()
                              });
 }
 
-static void postCompleteHandler()
-{
-    gpiod::line_event gpioLineEvent = postCompleteLine.event_read();
+// static void postCompleteHandler()
+// {
+//     gpiod::line_event gpioLineEvent = postCompleteLine.event_read();
 
-    bool postComplete =
-        gpioLineEvent.event_type == gpiod::line_event::FALLING_EDGE;
-    if (postComplete)
-    {
-        sendPowerControlEvent(Event::postCompleteAssert);
-        osIface->set_property("OperatingSystemState", std::string("Standby"));
-    }
-    else
-    {
-        sendPowerControlEvent(Event::postCompleteDeAssert);
-        osIface->set_property("OperatingSystemState", std::string("Inactive"));
-    }
-    postCompleteEvent.async_wait(
-        boost::asio::posix::stream_descriptor::wait_read,
-        [](const boost::system::error_code ec) {
-            if (ec)
-            {
-                std::cerr << "POST complete handler error: " << ec.message()
-                          << "\n";
-                return;
-            }
-            postCompleteHandler();
-        });
-}
+//     bool postComplete =
+//         gpioLineEvent.event_type == gpiod::line_event::FALLING_EDGE;
+//     if (postComplete)
+//     {
+//         sendPowerControlEvent(Event::postCompleteAssert);
+//         osIface->set_property("OperatingSystemState", std::string("Standby"));
+//     }
+//     else
+//     {
+//         sendPowerControlEvent(Event::postCompleteDeAssert);
+//         osIface->set_property("OperatingSystemState", std::string("Inactive"));
+//     }
+//     postCompleteEvent.async_wait(
+//         boost::asio::posix::stream_descriptor::wait_read,
+//         [](const boost::system::error_code ec) {
+//             if (ec)
+//             {
+//                 std::cerr << "POST complete handler error: " << ec.message()
+//                           << "\n";
+//                 return;
+//             }
+//             postCompleteHandler();
+//         });
+// }
 
 static int loadConfigValues()
 {
@@ -2176,6 +2181,11 @@ static int loadConfigValues()
     if (data.contains("RstOut"))
     {
         resetOutName = data["RstOut"];
+    }
+
+    if (data.contains("RstOutBtn"))
+    {
+        resetOutBtnName = data["RstOutBtn"];
     }
 
     if (data.contains("SIOOnCtl"))
@@ -2380,6 +2390,10 @@ int main(int argc, char* argv[])
         return -1;
     }
     if (!power_control::setGPIOOutput(power_control::resetOutName, 0, line))
+    {
+        return -1;
+    }
+    if (!power_control::setGPIOOutput(power_control::resetOutBtnName, 1, line))
     {
         return -1;
     }
