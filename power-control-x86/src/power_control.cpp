@@ -1353,6 +1353,7 @@ static void currentHostStateMonitor()
             if (*currentHostState ==
                 "xyz.openbmc_project.State.Host.HostState.Running")
             {
+                std::cerr << "Inside if (*currentHostState == xyz.openbmc_project.State.Host.HostState.Running)\n";
                 pohCounterTimerStart();
                 // Clear the restart cause set for the next restart
                 clearRestartCause();
@@ -1363,14 +1364,15 @@ static void currentHostStateMonitor()
             }
             else
             {
+                std::cerr << "Inside ELSE beginning\n";
                 pohCounterTimer.cancel();
                 // POST_COMPLETE GPIO event is not working in some platforms
                 // when power state is changed to OFF. This resulted in
                 // 'OperatingSystemState' to stay at 'Standby', even though
                 // system is OFF. Set 'OperatingSystemState' to 'Inactive'
                 // if HostState is trurned to OFF.
-                osIface->set_property("OperatingSystemState",
-                                      std::string("Inactive"));
+                // osIface->set_property("OperatingSystemState",
+                //                       std::string("Inactive"));
 
                 // Set the restart cause set for this restart
                 setRestartCause();
@@ -1379,6 +1381,8 @@ static void currentHostStateMonitor()
                                 "PRIORITY=%i", LOG_INFO,
                                 "REDFISH_MESSAGE_ID=%s",
                                 "OpenBMC.0.1.DCPowerOff", NULL);
+
+                std::cerr << "Inside ELSE end\n";
             }
         });
 }
