@@ -4,5 +4,6 @@
   "PwrOutOn": "POWER_OUT_ON",
   "PwrOutOff": "POWER_OUT_OFF",
   "RstButton": "RESET_BUTTON",
+  "RstOutBtn": "RESET_OUT_BUTTON",
   "RstOut": "RESET_OUT"
 }
